@@ -22,6 +22,7 @@
 .equ FLAG_RXERIF = 0b00000001
 .equ FLAG_TXERIF = 0b00000010
 .equ FLAG_PKTDEC = 0b01000000
+.equ FLAG_TXRST = 0b10000000
 
 ; Bank 0
 .equ REG_ERXST = 0x08
@@ -33,6 +34,7 @@
 .equ REG_ECON1 = 0x1F
 .equ REG_ECON2 = 0x1E
 .equ REG_EIR = 0x1C
+.equ REG_EWRPT = 0x02
 
 ; Bank 2
 .equ REG_MACON1 = 0x00
@@ -177,10 +179,19 @@ enc_sendpkt_prepare:
 		rcall enc_readreg
 		andi r16, FLAG_TXRTS
 		breq enc_sendpkt_prepare_1
-		; TODO Reset TX Error if set
+		ldi r16, REG_EIR
+		rcall enc_readreg
+		andi r16, FLAG_TXERIF
+		breq enc_sendpkt_prepare
+		ldi r16, REG_ECON1
+		ldi r17, FLAG_TXRST
+		rcall enc_regbits_set
+		ldi r16, REG_ECON1
+		ldi r17, FLAG_TXRST
+		rcall enc_regbits_clear
 		rjmp enc_sendpkt_prepare
 enc_sendpkt_prepare_1:
-		ldi r16, REG_ETXST
+		ldi r16, REG_EWRPT
 		ldi r17, low(ENC_TX_START)
 		ldi r18, high(ENC_TX_START)
 		rcall enc_writeword
@@ -225,6 +236,24 @@ enc_clearint:
 		ldi r17, FLAG_INTIE
 		rcall enc_regbits_set
 		ret
+
+;	Write buffer memory
+;	Data in r16
+;	Clobbers r17
+enc_writebuffer_single:
+		mov r17, r16
+		rcall enc_writebuffer_start
+		mov r16, r17
+		rcall spi_send
+		rcall enc_disa
+		ret
+
+enc_writebuffer_start:
+		rcall enc_ena
+		ldi r16, 0b01111010
+		rcall spi_send
+		ret
+
 
 ;	Set up the ENC chip for operation
 ;	Clobbers r16, r17, r18
