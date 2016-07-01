@@ -35,9 +35,29 @@ setup:
 		sei
 		nop
 
-		rjmp test_enc
+		rjmp enc_main
 
 stop:		rjmp stop
+
+led1on:
+		sbi PORTD, 5
+		ret
+
+led2on:
+		sbi PORTD, 7
+		ret
+
+led1off:
+		cbi PORTD, 5
+		ret
+
+led2off:
+		cbi PORTD, 7
+		ret
+
+enc_main:
+	rcall enc_setup
+	rjmp stop
 
 testmain:
 
