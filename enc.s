@@ -17,6 +17,11 @@
 .equ FLAG_INTIE = 0b10000000
 .equ FLAG_PKTIE = 0b01000000
 .equ FLAG_RXEN = 0b00000100
+.equ FLAG_TXRTS = 0b00001000
+.equ FLAG_PKTIF = 0b01000000
+.equ FLAG_RXERIF = 0b00000001
+.equ FLAG_TXERIF = 0b00000010
+.equ FLAG_PKTDEC = 0b01000000
 
 ; Bank 0
 .equ REG_ERXST = 0x08
@@ -26,6 +31,8 @@
 .equ REG_ETXND = 0x06
 .equ REG_EIE = 0x1B
 .equ REG_ECON1 = 0x1F
+.equ REG_ECON2 = 0x1E
+.equ REG_EIR = 0x1C
 
 ; Bank 2
 .equ REG_MACON1 = 0x00
@@ -116,7 +123,7 @@ enc_writeword:
 		rcall enc_writereg
 		ret
 
-;	Set bits in register
+;	Set/clear bits in register
 ;	Address in r16
 ;	Bitmask in r17
 ;	Clobbers r16
@@ -129,6 +136,18 @@ enc_regbits_set:
 enc_regbits_set_wait:
 		sbis SPSR, SPIF
 		rjmp enc_regbits_set_wait
+		rcall enc_disa
+		ret
+
+enc_regbits_clear:
+		rcall enc_ena
+		andi r16, 0b00011111
+		ori r16, 0b10100000
+		rcall spi_send
+		out SPDR, r17
+enc_regbits_clear_wait:
+		sbis SPSR, SPIF
+		rjmp enc_regbits_clear_wait
 		rcall enc_disa
 		ret
 
@@ -148,15 +167,71 @@ enc_selbank:
 		rcall enc_writereg
 		ret
 
+;	Prepare sending packet
+;	Data length in r16
+;	Clobbers r16, r17, r18, r19, r20
+enc_sendpkt_prepare:
+		mov r19, r16
+		ldi r20, 0
+		ldi r16, REG_ECON1
+		rcall enc_readreg
+		andi r16, FLAG_TXRTS
+		breq enc_sendpkt_prepare_1
+		; TODO Reset TX Error if set
+		rjmp enc_sendpkt_prepare
+enc_sendpkt_prepare_1:
+		ldi r16, REG_ETXST
+		ldi r17, low(ENC_TX_START)
+		ldi r18, high(ENC_TX_START)
+		rcall enc_writeword
+
+		ldi r16, REG_ETXND
+		ldi r17, low(ENC_TX_START)
+		ldi r18, high(ENC_TX_START)
+		add r17, r19
+		adc r18, r20
+		rcall enc_writeword
+		ret
+
+enc_sendpkt_xmit:
+		ldi r16, REG_ECON1
+		ldi r17, FLAG_TXRTS
+		rcall enc_regbits_set
+		ret
+
+;	Acknowledge received packet
+;	Clobbers r16, r17
+enc_packet_ack:
+		ldi r16, REG_ECON2
+		ldi r17, FLAG_PKTDEC
+		rcall enc_regbits_set
+		ret
+
+;	Clear interrupts
+;	Clobbers r16, r17
+enc_clearint:
+		ldi r16, REG_EIE
+		ldi r17, FLAG_INTIE
+		rcall enc_regbits_clear
+
+		ldi r16, REG_EIR
+		rcall enc_readreg
+
+		ldi r16, REG_EIR
+		ldi r17, FLAG_PKTIF | FLAG_RXERIF | FLAG_TXERIF
+		rcall enc_regbits_clear
+
+		ldi r16, REG_EIE
+		ldi r17, FLAG_INTIE
+		rcall enc_regbits_set
+		ret
+
 ;	Set up the ENC chip for operation
-;	Clobbers r17, r18, r19
+;	Clobbers r16, r17, r18
 ;	Contains hardcoded MAC address
 enc_setup:
 		rcall led1on
 		rcall led2on
-		rcall longdelay
-		rcall longdelay
-		rcall longdelay
 		rcall longdelay
 		rcall enc_softreset
 		rcall led1off
@@ -186,7 +261,7 @@ enc_setup:
 		ldi r18, high(ENC_TX_END)
 		rcall enc_writeword
 
-		rcall longdelay
+		rcall delay
 
 		ldi r16, 0b00000010
 		rcall enc_selbank
@@ -217,7 +292,7 @@ enc_setup:
 		ldi r18, high(MAX_PKG_LEN)
 		rcall enc_writeword
 
-		rcall longdelay
+		rcall delay
 
 		ldi r16, 0b00000011
 		rcall enc_selbank
@@ -246,7 +321,7 @@ enc_setup:
 		ldi r17, 0xCB
 		rcall enc_writereg
 
-		rcall longdelay
+		rcall delay
 
 		ldi r16, 0x00
 		rcall enc_selbank

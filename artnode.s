@@ -5,6 +5,11 @@ rjmp setup
 
 .include "enc.s"
 
+.equ PIN_LED1 = 5
+.equ PIN_LED2 = 7
+.equ PIN_CSEL = 6
+.equ PIN_CINT = 4
+
 setup:
 		cli
 		; Create stack
@@ -15,7 +20,7 @@ setup:
 
 		ldi r16, 0b11100000
 		out DDRD, r16
-		ldi r16, 0b01000000
+		ldi r16, 0b01010000
 		out PORTD, r16
 
 		ldi r16, 25
@@ -40,76 +45,42 @@ setup:
 stop:		rjmp stop
 
 led1on:
-		sbi PORTD, 5
+		sbi PORTD, PIN_LED1
 		ret
 
 led2on:
-		sbi PORTD, 7
+		sbi PORTD, PIN_LED2
 		ret
 
 led1off:
-		cbi PORTD, 5
+		cbi PORTD, PIN_LED1
 		ret
 
 led2off:
-		cbi PORTD, 7
+		cbi PORTD, PIN_LED2
 		ret
 
 enc_main:
 	rcall enc_setup
-	rjmp stop
 
-testmain:
+mloop:
+	; Check for link
+	; Set LED
+	; Check for interrupt
+	sbis PIND, PIN_CINT
+	rcall detected
+	rjmp mloop
 
-	ldi r16, 0b10100000
-	out PORTD, r16
-
-	ldi r18, 0
-
-lp:
-	ldi r16, 0b10100000
-	out PORTD, r16
-	rcall delay
-	mov r16, r18
-
-	rcall spi_send
-	ldi r16, 0b11100000
-	out PORTD, r16
-	inc r18
-	brne lp
-
-	ldi r16, 0b01000000
-	out PORTD, r16
-	rjmp stop
-
-
-test_enc:
+detected:
+	rcall led2on
+	rcall enc_packet_ack
+	rcall enc_clearint
 	rcall longdelay
+	rcall led2off
+	ret
 
-	ldi r16, 0b11100000
-	out PORTD, r16
 
-	ldi r16, 0b00000010
-	rcall enc_selbank
 
-	;rcall delay
-	ldi r16, 0b00010100
-	ldi r17, 0b00010100
-	rcall enc_writereg
-
-	;rcall delay
-	ldi r16, 0b00010110
-	ldi r17, 0b00111011
-	rcall enc_writereg
-
-	;rcall delay
-	ldi r16, 0b00010111
-	ldi r17, 0b10100000
-	rcall enc_writereg
-
-	ldi r16, 0b01000000
-	out PORTD, r16
-rjmp stop
 
 txloop:
 		ldi r16, 'C'
