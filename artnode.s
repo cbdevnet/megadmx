@@ -3,12 +3,12 @@
 .org 0
 rjmp setup
 
-.include "enc.s"
-
 .equ PIN_LED1 = 5
 .equ PIN_LED2 = 7
 .equ PIN_CSEL = 6
 .equ PIN_CINT = 4
+
+.include "enc.s"
 
 setup:
 		cli
@@ -18,11 +18,13 @@ setup:
 	        ldi r16, high(RAMEND)
 	        out SPH, r16
 
+		; Set up I/O port
 		ldi r16, 0b11100000
 		out DDRD, r16
 		ldi r16, 0b01010000
 		out PORTD, r16
 
+		; Set up UART
 		ldi r16, 25
 		out UBRRL, r16
 		ldi r16, (1 << TXEN)
@@ -69,7 +71,7 @@ mloop:
 	; Check for interrupt
 	sbis PIND, PIN_CINT
 	rcall detected
-	rcall tx_demo
+	rcall xmit_dummy_pkt
 	rjmp mloop
 
 detected:
@@ -80,128 +82,35 @@ detected:
 	rcall led2off
 	ret
 
-tx_demo:
+xmit_dummy_pkt:
 	ldi r16, 46
 	rcall enc_sendpkt_prepare
 	rcall enc_writebuffer_start
-	
+
+	; Control byte
 	ldi r16, 0
 	rcall spi_send
 
-	; MAC
-	ldi r16, 0xFF
-	rcall spi_send
-	rcall spi_send
-	rcall spi_send
-	rcall spi_send
-	rcall spi_send
-	rcall spi_send
-	ldi r16, 0x5C
-	rcall spi_send
-	ldi r16, 0xFF
-	rcall spi_send
-	ldi r16, 0x35
-	rcall spi_send
-	ldi r16, 0xCB
-	rcall spi_send
-	ldi r16, 0xCB
-	rcall spi_send
-	ldi r16, 0xCB
-	rcall spi_send
-	ldi r16, 0x08
-	rcall spi_send
-	ldi r16, 0x00
-	rcall spi_send
+	; Packet contents
+	ldi ZL, low(dummy_pkt << 1)
+	ldi ZL, high(dummy_pkt << 1)
+	ldi r16, 46
+	rcall spi_flash_xmit
 
-	; IP
-	ldi r16, 0x45
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 20+12
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 42
-	rcall spi_send
-	ldi r16, 17
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 129
-	rcall spi_send
-	ldi r16, 13
-	rcall spi_send
-	ldi r16, 215
-	rcall spi_send
-	ldi r16, 90
-	rcall spi_send
-	ldi r16, 255
-	rcall spi_send
-	ldi r16, 255
-	rcall spi_send
-	ldi r16, 255
-	rcall spi_send
-	ldi r16, 255
-	rcall spi_send
-
-	; UDP
-	ldi r16, high(8080)
-	rcall spi_send
-	ldi r16, low(8080)
-	rcall spi_send
-	ldi r16, high(8080)
-	rcall spi_send
-	ldi r16, low(8080)
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 12
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 0
-	rcall spi_send
-	ldi r16, 'H'
-	rcall spi_send
-	ldi r16, 'E'
-	rcall spi_send
-	ldi r16, 'L'
-	rcall spi_send
-	ldi r16, 'O'
-	rcall spi_send
 	rcall enc_disa
 	rcall enc_sendpkt_xmit
 	ret
 
-
-txloop:
-		ldi r16, 'C'
-		out UDR, r16
-dotx:
-		sbis UCSRA, UDRE
-		rjmp dotx
-		rjmp txloop
-
-
 flashloop:
-	ldi ZL, low(str1)
-	ldi ZH, high(str1)
+	ldi ZL, low(str1 << 1)
+	ldi ZH, high(str1 << 1)
 	rcall uart_txflash
 	rjmp flashloop
 
+
+
 ;	Transmit string from flash via UART
-;	String address in ZH/ZL hi/lo
+;	String address << 1 in ZH/ZL hi/lo
 ;	Clobbers: r16
 uart_txflash:
 		; Load data from flash
@@ -222,8 +131,24 @@ uart_txflash_end:
 		rjmp uart_txflash_end
 		ret
 
+;	Transmit flash data to SPI
+;	Address << 1 in ZH/ZL
+;	Length in r16
+;	Clobbers r16, r17
+spi_flash_xmit:
+		mov r17, r16
+spi_flash_xmit_1:
+		tst r17
+		breq spi_flash_xmit_end
+		lpm r16, Z+
+		rcall spi_send
+		dec r17
+		rjmp spi_flash_xmit_1
+spi_flash_xmit_end:
+		ret
+
 ;	Delay functions
-;	Clobber: r16, r17
+;	Clobbers r16, r17
 longdelay:
 		ldi r16, 0xFF
 longdelay_inner:
@@ -241,3 +166,30 @@ delay_inner:
 
 
 str1:	.DB "Yay this seems to work! \0"
+
+dummy_pkt:
+	; MAC
+	.DW 0xFFFF 			; Destination address
+	.DW 0xFFFF
+	.DW 0xFFFF
+	.DB 0x5C, 0xFF			; Source address
+	.DB 0x35, 0xCB
+	.DB 0xCB, 0xCB
+	.DB 0x08, 0x00 			; Type (IP)
+
+	; IP
+	.DB 0x45, 0x00 			; Type (IPv4), Header length (5 * DWORD) //TODO split second byte
+	.DB 0x00, 20+12			; Data length (Header + Payload)
+	.DW 0x0000			; Diffserv/ECN?
+	.DW 0x0000			; CRC?
+	.DB 0x42, 0x17			; TTL & Type (UDP)
+	.DW 0x0000			; ?
+	.DB 129, 13, 215, 90		; Source address
+	.DB 255, 255, 255, 255		; Destination address
+
+	; UDP
+	.DW 8080			; Source port // FIXME LE
+	.DW 8080			; Destination port
+	.DB 0, 12			; Data len
+	.DW 0x0000			; CRC
+	.DB "HELO"

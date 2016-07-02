@@ -55,11 +55,11 @@
 
 ;	Enable/Disable ENC Chip
 enc_ena:
-		cbi PORTD, 6
+		cbi PORTD, PIN_CSEL
 		ret
 
 enc_disa:
-		sbi PORTD, 6
+		sbi PORTD, PIN_CSEL
 		ret
 
 ;	Send arbitrary byte via SPI
@@ -155,7 +155,7 @@ enc_regbits_clear_wait:
 
 ;	Select ENC register bank
 ;	Bank no in r16
-;	Clobbers: r17
+;	Clobbers: r16, r17
 ;	FIXME Do this with enc_regbits_set
 enc_selbank:
 		mov r17, r16
