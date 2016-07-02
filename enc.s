@@ -254,7 +254,6 @@ enc_writebuffer_start:
 		rcall spi_send
 		ret
 
-
 ;	Set up the ENC chip for operation
 ;	Clobbers r16, r17, r18
 ;	Contains hardcoded MAC address

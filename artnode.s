@@ -69,6 +69,7 @@ mloop:
 	; Check for interrupt
 	sbis PIND, PIN_CINT
 	rcall detected
+	rcall tx_demo
 	rjmp mloop
 
 detected:
@@ -79,7 +80,109 @@ detected:
 	rcall led2off
 	ret
 
+tx_demo:
+	ldi r16, 46
+	rcall enc_sendpkt_prepare
+	rcall enc_writebuffer_start
+	
+	ldi r16, 0
+	rcall spi_send
 
+	; MAC
+	ldi r16, 0xFF
+	rcall spi_send
+	rcall spi_send
+	rcall spi_send
+	rcall spi_send
+	rcall spi_send
+	rcall spi_send
+	ldi r16, 0x5C
+	rcall spi_send
+	ldi r16, 0xFF
+	rcall spi_send
+	ldi r16, 0x35
+	rcall spi_send
+	ldi r16, 0xCB
+	rcall spi_send
+	ldi r16, 0xCB
+	rcall spi_send
+	ldi r16, 0xCB
+	rcall spi_send
+	ldi r16, 0x08
+	rcall spi_send
+	ldi r16, 0x00
+	rcall spi_send
+
+	; IP
+	ldi r16, 0x45
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 20+12
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 42
+	rcall spi_send
+	ldi r16, 17
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 129
+	rcall spi_send
+	ldi r16, 13
+	rcall spi_send
+	ldi r16, 215
+	rcall spi_send
+	ldi r16, 90
+	rcall spi_send
+	ldi r16, 255
+	rcall spi_send
+	ldi r16, 255
+	rcall spi_send
+	ldi r16, 255
+	rcall spi_send
+	ldi r16, 255
+	rcall spi_send
+
+	; UDP
+	ldi r16, high(8080)
+	rcall spi_send
+	ldi r16, low(8080)
+	rcall spi_send
+	ldi r16, high(8080)
+	rcall spi_send
+	ldi r16, low(8080)
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 12
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 0
+	rcall spi_send
+	ldi r16, 'H'
+	rcall spi_send
+	ldi r16, 'E'
+	rcall spi_send
+	ldi r16, 'L'
+	rcall spi_send
+	ldi r16, 'O'
+	rcall spi_send
+	rcall enc_disa
+	rcall enc_sendpkt_xmit
+	ret
 
 
 txloop:
