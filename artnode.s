@@ -40,9 +40,12 @@ setup:
 		out SPCR, r16
 
 		sei
-		nop
 
-		rjmp enc_main
+		; Set up the ENC
+		rcall enc_setup
+
+		; Run the main loop
+		rjmp main
 
 stop:		rjmp stop
 
@@ -62,17 +65,14 @@ led2off:
 		cbi PORTD, PIN_LED2
 		ret
 
-enc_main:
-	rcall enc_setup
-
-mloop:
+main:
 	; Check for link
 	; Set LED
 	; Check for interrupt
 	sbis PIND, PIN_CINT
 	rcall detected
 	rcall xmit_dummy_pkt
-	rjmp mloop
+	rjmp main
 
 detected:
 	rcall led2on
