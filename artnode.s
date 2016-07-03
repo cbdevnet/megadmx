@@ -41,6 +41,8 @@ setup:
 
 		sei
 
+		;rjmp testmain
+
 		; Set up the ENC
 		rcall enc_setup
 
@@ -65,20 +67,24 @@ led2off:
 		cbi PORTD, PIN_LED2
 		ret
 
+
+testmain:
+	rjmp stop
+
 main:
 	; Check for link
 	; Set LED
 	; Check for interrupt
 	sbis PIND, PIN_CINT
 	rcall detected
-	rcall xmit_dummy_pkt
 	rjmp main
 
 detected:
 	rcall led2on
 	rcall enc_packet_ack
 	rcall enc_clearint
-	rcall longdelay
+	;rcall xmit_dummy_pkt
+	;rcall longdelay
 	rcall led2off
 	ret
 
@@ -93,7 +99,7 @@ xmit_dummy_pkt:
 
 	; Packet contents
 	ldi ZL, low(dummy_pkt << 1)
-	ldi ZL, high(dummy_pkt << 1)
+	ldi ZH, high(dummy_pkt << 1)
 	ldi r16, 46
 	rcall spi_flash_xmit
 
@@ -169,9 +175,9 @@ str1:	.DB "Yay this seems to work! \0"
 
 dummy_pkt:
 	; MAC
-	.DW 0xFFFF 			; Destination address
-	.DW 0xFFFF
-	.DW 0xFFFF
+	.DB 0x5C, 0xFF 			; Destination address
+	.DB 0x35, 0x08
+	.DB 0xA6, 0x88
 	.DB 0x5C, 0xFF			; Source address
 	.DB 0x35, 0xCB
 	.DB 0xCB, 0xCB
@@ -182,10 +188,10 @@ dummy_pkt:
 	.DB 0x00, 20+12			; Data length (Header + Payload)
 	.DW 0x0000			; Diffserv/ECN?
 	.DW 0x0000			; CRC?
-	.DB 0x42, 0x17			; TTL & Type (UDP)
+	.DB 42, 17			; TTL & Type (UDP)
 	.DW 0x0000			; ?
 	.DB 129, 13, 215, 90		; Source address
-	.DB 255, 255, 255, 255		; Destination address
+	.DB 129, 13, 215, 89		; Destination address
 
 	; UDP
 	.DW 8080			; Source port // FIXME LE

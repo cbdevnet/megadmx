@@ -23,6 +23,7 @@
 .equ FLAG_TXERIF = 0b00000010
 .equ FLAG_PKTDEC = 0b01000000
 .equ FLAG_TXRST = 0b10000000
+.equ FLAG_PMEN = 0b00010000
 
 ; Bank 0
 .equ REG_ERXST = 0x08
@@ -35,6 +36,15 @@
 .equ REG_ECON2 = 0x1E
 .equ REG_EIR = 0x1C
 .equ REG_EWRPT = 0x02
+
+; Bank 1
+.equ REG_EPMM0 = 0x08
+.equ REG_EPMM2 = 0x0A
+.equ REG_EPMM4 = 0x0C
+.equ REG_EPMM6 = 0x0E
+.equ REG_EPMO = 0x14
+.equ REG_ERXFCON = 0x18
+.equ REG_EPMCS = 0x10
 
 ; Bank 2
 .equ REG_MACON1 = 0x00
@@ -291,9 +301,38 @@ enc_setup:
 
 		rcall delay
 
-		ldi r16, 0b00000010
+		ldi r16, 0b00000001
 		rcall enc_selbank
 		
+		ldi r16, REG_ERXFCON
+		ldi r17, FLAG_UCEN | FLAG_CRCEN | FLAG_PMEN | FLAG_BCEN
+		rcall enc_writereg
+
+		ldi r16, REG_EPMCS
+		ldi r17, 0x55
+		ldi r18, 0x7D
+		rcall enc_writeword
+
+		ldi r16, REG_EPMO
+		ldi r17, 0x16
+		ldi r18, 0
+		rcall enc_writeword
+
+		ldi r16, REG_EPMM0
+		ldi r17, 0x80
+		ldi r18, 0x0F
+		rcall enc_writeword
+
+		ldi r16, REG_EPMM2
+		ldi r17, 0x0F
+		ldi r18, 0xF0
+		rcall enc_writeword
+
+		rcall delay
+
+		ldi r16, 0b00000010
+		rcall enc_selbank
+
 		ldi r16, REG_MACON1
 		ldi r17, FLAG_TXPAUS | FLAG_RXPAUS | FLAG_MARXEN
 		rcall enc_writereg
