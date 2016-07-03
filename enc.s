@@ -25,6 +25,8 @@
 .equ FLAG_TXRST = 0b10000000
 .equ FLAG_PMEN = 0b00010000
 
+.equ STATUS_RECV_OK = 0b10000000
+
 ; Bank 0
 .equ REG_ERXST = 0x08
 .equ REG_ERXRDPT = 0x0C
@@ -36,6 +38,7 @@
 .equ REG_ECON2 = 0x1E
 .equ REG_EIR = 0x1C
 .equ REG_EWRPT = 0x02
+.equ REG_ERDPT = 0x00
 
 ; Bank 1
 .equ REG_EPMM0 = 0x08
@@ -61,6 +64,7 @@
 .equ REG_MAADR4 = 0x03
 .equ REG_MAADR1 = 0x04
 .equ REG_MAADR2 = 0x05
+.equ REG_EREVID = 0x12
 
 
 ;	Enable/Disable ENC Chip
@@ -79,6 +83,48 @@ spi_send:
 spi_send_wait:
 		sbis SPSR, SPIF
 		rjmp spi_send_wait
+		ret
+
+;	Skip SPI buffer bytes
+;	Count in r16
+;	Clobbers r16, r17
+spi_skip:
+		mov r17, r16
+spi_skip_1:
+		ldi r16, 0
+		rcall spi_send
+		dec r17
+		breq spi_skip_done
+		rjmp spi_skip_1
+spi_skip_done:
+		ret
+
+;	Compare SPI buffer bytes
+;	Data pointer << 1 in ZL/ZH
+;	Length in r16
+;	Clobbers r16, r17, r18
+;	Reads length bytes from stream in any case
+;	r16 = 0 if match
+spi_compare:
+		mov r18, r16
+		ldi r16, 0
+spi_compare_1:
+		rcall spi_send
+		lpm r17, Z+
+		in r16, SPDR
+		cp r16, r17
+		brne spi_compare_skip
+		ldi r16, 0
+		dec r18
+		breq spi_compare_done
+		rjmp spi_compare_1
+spi_compare_skip:
+		ldi r16, 1
+		dec r18
+		breq spi_compare_done
+		rcall spi_send
+		rjmp spi_compare_skip
+spi_compare_done:
 		ret
 
 ;	Write ENC control register
@@ -249,7 +295,7 @@ enc_clearint:
 
 ;	Write buffer memory
 ;	Data in r16
-;	Clobbers r17
+;	Clobbers r17, r16
 enc_writebuffer_single:
 		mov r17, r16
 		rcall enc_writebuffer_start
@@ -261,6 +307,22 @@ enc_writebuffer_single:
 enc_writebuffer_start:
 		rcall enc_ena
 		ldi r16, 0b01111010
+		rcall spi_send
+		ret
+
+;	Read buffer memory
+;	Output in r16
+;	Clobbers r16
+enc_readbuffer_single:
+		rcall enc_readbuffer_start
+		ldi r16, 0
+		rcall spi_send
+		rcall enc_disa
+		ret
+
+enc_readbuffer_start:
+		rcall enc_ena
+		ldi r16, 0b00111010
 		rcall spi_send
 		ret
 
@@ -277,6 +339,8 @@ enc_setup:
 		ldi r16, REG_ERXST
 		ldi r17, low(ENC_RX_START)
 		ldi r18, high(ENC_RX_START)
+		sts SRAM_NEXTPACKET_LOW, r17
+		sts SRAM_NEXTPACKET_HIGH, r18
 		rcall enc_writeword
 
 		ldi r16, REG_ERXRDPT
@@ -387,6 +451,9 @@ enc_setup:
 		ldi r16, REG_MAADR1
 		ldi r17, 0xCB
 		rcall enc_writereg
+
+		ldi r16, REG_EREVID
+		rcall enc_readreg
 
 		rcall delay
 

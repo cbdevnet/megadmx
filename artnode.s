@@ -8,6 +8,10 @@ rjmp setup
 .equ PIN_CSEL = 6
 .equ PIN_CINT = 4
 
+.equ SRAM_NEXTPACKET_LOW = (SRAM_START)
+.equ SRAM_NEXTPACKET_HIGH = (SRAM_START + 1)
+.equ SRAM_DATA_START = (SRAM_START + 20)
+
 .include "enc.s"
 
 setup:
@@ -81,10 +85,11 @@ main:
 
 detected:
 	rcall led2on
-	rcall enc_packet_ack
-	rcall enc_clearint
+	;rcall enc_packet_ack
+	;rcall enc_clearint
 	;rcall xmit_dummy_pkt
 	;rcall longdelay
+	rcall read_pkt
 	rcall led2off
 	ret
 
@@ -113,7 +118,139 @@ flashloop:
 	rcall uart_txflash
 	rjmp flashloop
 
+read_pkt:
+	ldi r16, REG_ERDPT
+	lds r17, SRAM_NEXTPACKET_LOW
+	lds r18, SRAM_NEXTPACKET_HIGH
+	rcall enc_writeword
 
+	rcall enc_readbuffer_start
+	
+	; Read next packet ptr
+	ldi r16, 0
+	rcall spi_send
+	in r16, SPDR
+	sts SRAM_NEXTPACKET_LOW, r16
+	ldi r16, 0
+	rcall spi_send
+	in r16, SPDR
+	sts SRAM_NEXTPACKET_HIGH, r16
+
+	; Read packet data length (r20/r21)
+	ldi r16, 0
+	rcall spi_send
+	in r20, SPDR
+	rcall spi_send
+	in r21, SPDR
+
+	; Read status vector
+	rcall spi_send
+	in r16, SPDR
+	andi r16, STATUS_RECV_OK
+	breq read_pkt_exit
+	ldi r16, 0
+	rcall spi_send
+
+	; Assert a complete Art-Net header
+	ldi r16, 0x3B
+	ldi r17, 0
+	cp r20, r16
+	cpc r21, r17
+	brlt read_pkt_exit
+
+	; TODO Calculate proper offset into packet for Art-Net header
+	; instead of reading unnecessary data
+
+	; TODO Make sure to not read over packet length
+
+	; FIXME This could all be done better by interleaving SPI reads
+	; with stores
+
+	; Skip to port bytes
+	ldi r16, 0x22
+	rcall spi_skip
+
+	ldi ZL, low(artnet_hdr_1 << 1)
+	ldi ZH, high(artnet_hdr_1 << 1)
+	ldi r16, 4
+	rcall spi_compare
+
+	tst r16
+	brne read_pkt_exit
+
+	ldi r16, 4
+	rcall spi_skip
+
+	ldi ZL, low(artnet_hdr_2 << 1)
+	ldi ZH, high(artnet_hdr_2 << 1)
+	ldi r16, 10
+	rcall spi_compare
+
+	tst r16
+	brne read_pkt_exit
+
+	rcall led1on
+
+	ldi r16, 4
+	rcall spi_skip
+
+	ldi r16, 0
+	; Read Universe to r1/r2 //TODO compare
+	rcall spi_send
+	in r1, SPDR
+	rcall spi_send
+	in r2, SPDR
+
+	; Read number of channels to r17/r18
+	rcall spi_send
+	in r17, SPDR
+	rcall spi_send
+	in r18, SPDR
+
+	; TODO Check for #channels <= 512
+
+	; Read channel data
+	ldi XL, low(SRAM_DATA_START)
+	ldi XH, high(SRAM_DATA_START)
+	ldi r19, 0
+	ldi r20, 0
+	
+read_pkt_channel:
+	ldi r16, 0
+	rcall spi_send
+	in r16, SPDR
+	st X+, r16
+	subi r18, 1
+	sbci r17, 0
+	cp r18, r19
+	cpc r17, r20
+	brne read_pkt_channel
+
+	rcall led1off
+
+read_pkt_exit:
+	; End buffer transfer
+	rcall enc_disa
+
+	; Update RX read pointer to free memory
+	ldi r16, REG_ERXRDPT
+	lds r17, SRAM_NEXTPACKET_LOW
+	lds r18, SRAM_NEXTPACKET_HIGH
+	cpi r17, low(ENC_RX_START)
+	breq read_pkt_exit_calc
+	cpi r18, high(ENC_RX_START)
+	breq read_pkt_exit_calc
+	ldi r17, low(ENC_RX_END)
+	ldi r18, high(ENC_RX_END)
+	rjmp read_pkt_exit_write
+read_pkt_exit_calc:
+	subi r17, 1
+	sbci r18, 0
+read_pkt_exit_write:
+	rcall enc_writeword
+	rcall enc_packet_ack
+	rcall enc_clearint
+	ret
 
 ;	Transmit string from flash via UART
 ;	String address << 1 in ZH/ZL hi/lo
@@ -171,7 +308,7 @@ delay_inner:
 	        ret
 
 
-str1:	.DB "Yay this seems to work! \0"
+str1:	.DB "Yay this seems to work!", 0x00
 
 dummy_pkt:
 	; MAC
@@ -194,8 +331,14 @@ dummy_pkt:
 	.DB 129, 13, 215, 89		; Destination address
 
 	; UDP
-	.DW 8080			; Source port // FIXME LE
-	.DW 8080			; Destination port
+	.DB high(8080), low(8080)	; Source port
+	.DB high(8080), low(8080)	; Destination port
 	.DB 0, 12			; Data len
 	.DW 0x0000			; CRC
 	.DB "HELO"
+
+artnet_hdr_1:
+	.DB 0x19, 0x36, 0x19, 0x36
+
+artnet_hdr_2:
+	.DB "Art-Net", 0x00, 0x00, 0x50
