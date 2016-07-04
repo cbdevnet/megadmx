@@ -237,9 +237,9 @@ read_pkt_exit:
 	lds r17, SRAM_NEXTPACKET_LOW
 	lds r18, SRAM_NEXTPACKET_HIGH
 	cpi r17, low(ENC_RX_START)
-	breq read_pkt_exit_calc
+	brne read_pkt_exit_calc
 	cpi r18, high(ENC_RX_START)
-	breq read_pkt_exit_calc
+	brne read_pkt_exit_calc
 	ldi r17, low(ENC_RX_END)
 	ldi r18, high(ENC_RX_END)
 	rjmp read_pkt_exit_write
@@ -315,8 +315,8 @@ dummy_pkt:
 	.DB 0x5C, 0xFF 			; Destination address
 	.DB 0x35, 0x08
 	.DB 0xA6, 0x88
-	.DB 0x5C, 0xFF			; Source address
-	.DB 0x35, 0xCB
+	.DB 0x0E, 0xCB			; Source address
+	.DB 0xCB, 0xCB
 	.DB 0xCB, 0xCB
 	.DB 0x08, 0x00 			; Type (IP)
 

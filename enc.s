@@ -1,5 +1,5 @@
 .equ ENC_RX_START = 0
-.equ ENC_RX_END = (0x1FFF - 1501)
+.equ ENC_RX_END = (0x1FFF - 1500 - 1)
 .equ ENC_TX_START = (0x1FFF - 1500)
 .equ ENC_TX_END = 0x1FFF
 .equ MAX_PKG_LEN = 1024
@@ -429,15 +429,15 @@ enc_setup:
 		rcall enc_selbank
 
 		ldi r16, REG_MAADR6
-		ldi r17, 0x5C
+		ldi r17, 0x0E
 		rcall enc_writereg
 
 		ldi r16, REG_MAADR5
-		ldi r17, 0xFF
+		ldi r17, 0xCB
 		rcall enc_writereg
 
 		ldi r16, REG_MAADR4
-		ldi r17, 0x35
+		ldi r17, 0xCB
 		rcall enc_writereg
 
 		ldi r16, REG_MAADR3
