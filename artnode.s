@@ -23,25 +23,29 @@ setup:
 	        out SPH, r16
 
 		; Set up I/O port
-		ldi r16, 0b11100000
+		ldi r16, 0b11100010
 		out DDRD, r16
 		ldi r16, 0b01010000
 		out PORTD, r16
 
 		; Set up UART
-		ldi r16, 25
+		ldi r16, 1
 		out UBRRL, r16
 		ldi r16, (1 << TXEN)
 		out UCSRB, r16
 		;ldi r16, (1 << URSEL) | (1 << UCSZ1)
-		ldi r16, (1 << URSEL) | (1 << UCSZ0) | (1 << UCSZ1)
+		ldi r16, (1 << URSEL) | (1 << UCSZ0) | (1 << UCSZ1) | (1 << USBS)
 		out UCSRC, r16
 		
 		; Set up SPI
 		ldi r16, 0b10100000
 		out DDRB, r16
-		ldi r16, (1 << SPE) | (1 << MSTR) | (1 << SPR0) | (1 << SPR1)
+		ldi r16, (1 << SPE) | (1 << MSTR) ; | (1 << SPR0) ; | (1 << SPR1)
 		out SPCR, r16
+
+		; Set up visualizer port
+		ldi r16, 0xFF
+		out DDRA, r16
 
 		sei
 
@@ -81,15 +85,19 @@ main:
 	; Check for interrupt
 	sbis PIND, PIN_CINT
 	rcall detected
+	;ldi YL, low(SRAM_DATA_START + 100)
+	;ldi YH, high(SRAM_DATA_START + 100)
+	;ld r8, Z
+	;rcall xmit_dummy_pkt
 	rjmp main
 
 detected:
 	rcall led2on
-	;rcall enc_packet_ack
-	;rcall enc_clearint
 	;rcall xmit_dummy_pkt
 	;rcall longdelay
 	rcall read_pkt
+	rcall enc_packet_ack
+	rcall enc_clearint
 	rcall led2off
 	ret
 
@@ -215,16 +223,20 @@ read_pkt:
 	ldi r19, 0
 	ldi r20, 0
 	
-read_pkt_channel:
-	ldi r16, 0
-	rcall spi_send
+	out SPDR, r19
+read_pkt_channel_wait:
+	sbis SPSR, SPIF
+	rjmp read_pkt_channel_wait
 	in r16, SPDR
+	out SPDR, r19
 	st X+, r16
 	subi r18, 1
 	sbci r17, 0
 	cp r18, r19
 	cpc r17, r20
-	brne read_pkt_channel
+	brne read_pkt_channel_wait
+
+	; FIXME This reads one byte after the packet
 
 	rcall led1off
 
@@ -248,8 +260,6 @@ read_pkt_exit_calc:
 	sbci r18, 0
 read_pkt_exit_write:
 	rcall enc_writeword
-	rcall enc_packet_ack
-	rcall enc_clearint
 	ret
 
 ;	Transmit string from flash via UART
