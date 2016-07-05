@@ -40,7 +40,7 @@ setup:
 		; Set up SPI
 		ldi r16, 0b10100000
 		out DDRB, r16
-		ldi r16, (1 << SPE) | (1 << MSTR) ; | (1 << SPR0) ; | (1 << SPR1)
+		ldi r16, (1 << SPE) | (1 << MSTR) ; | (1 << SPR0) | (1 << SPR1)
 		out SPCR, r16
 
 		; Set up visualizer port
@@ -49,10 +49,10 @@ setup:
 
 		sei
 
-		;rjmp testmain
-
 		; Set up the ENC
 		rcall enc_setup
+
+		rjmp testmain
 
 		; Run the main loop
 		rjmp main
@@ -77,7 +77,9 @@ led2off:
 
 
 testmain:
+	rcall xmit_dummy_pkt
 	rjmp stop
+	rjmp testmain
 
 main:
 	; Check for link
@@ -322,9 +324,9 @@ str1:	.DB "Yay this seems to work!", 0x00
 
 dummy_pkt:
 	; MAC
-	.DB 0x5C, 0xFF 			; Destination address
-	.DB 0x35, 0x08
-	.DB 0xA6, 0x88
+	.DB 0xFF, 0xFF 			; Destination address
+	.DB 0xFF, 0xFF
+	.DB 0xFF, 0xFF
 	.DB 0x0E, 0xCB			; Source address
 	.DB 0xCB, 0xCB
 	.DB 0xCB, 0xCB
@@ -337,8 +339,8 @@ dummy_pkt:
 	.DW 0x0000			; CRC?
 	.DB 42, 17			; TTL & Type (UDP)
 	.DW 0x0000			; ?
-	.DB 129, 13, 215, 90		; Source address
-	.DB 129, 13, 215, 89		; Destination address
+	.DB 10, 11, 12, 3		; Source address
+	.DB 10, 11, 12, 1		; Destination address
 
 	; UDP
 	.DB high(8080), low(8080)	; Source port

@@ -24,6 +24,7 @@
 .equ FLAG_PKTDEC = 0b01000000
 .equ FLAG_TXRST = 0b10000000
 .equ FLAG_PMEN = 0b00010000
+.equ FLAG_TXIF = 0b00001000
 
 .equ STATUS_RECV_OK = 0b10000000
 
@@ -261,6 +262,9 @@ enc_sendpkt_prepare_1:
 		ret
 
 enc_sendpkt_xmit:
+		ldi r16, REG_EIR
+		ldi r17, FLAG_TXIF
+		rcall enc_regbits_clear
 		ldi r16, REG_ECON1
 		ldi r17, FLAG_TXRTS
 		rcall enc_regbits_set
