@@ -1,5 +1,8 @@
 .PHONY: all clean
 
+# Programmer options
+PROGRAMMER=-c stk500v2 -P /dev/ttyACM0
+
 # Mega8
 PART=m8
 LFUSE_1=0xe1
@@ -14,19 +17,19 @@ HFUSE_8=0xd9
 #HFUSE_1=0x99
 #HFUSE_8=0x99
 
-all: artnode
+all: megadmx
 
 install:
-	avrdude -p $(PART) -c stk500v2 -P /dev/ttyACM0 -U artnode.s.hex
+	avrdude -p $(PART) $(PROGRAMMER) -U megadmx.s.hex
 
-install-8:
-	avrdude -p $(PART) -c stk500v2 -P /dev/ttyACM0 -U artnode.s.hex -U lfuse:w:$(LFUSE_8):m -U hfuse:w:$(HFUSE_8):m
+speed-8:
+	avrdude -p $(PART) $(PROGRAMMER) -U lfuse:w:$(LFUSE_8):m -U hfuse:w:$(HFUSE_8):m
 
-install-1:
-	avrdude -p $(PART) -c stk500v2 -P /dev/ttyACM0 -U artnode.s.hex -U lfuse:w:$(LFUSE_1):m -U hfuse:w:$(HFUSE_1):m
+speed-1:
+	avrdude -p $(PART) $(PROGRAMMER) -U lfuse:w:$(LFUSE_1):m -U hfuse:w:$(HFUSE_1):m
 
-artnode:
-	avra artnode.s
+megadmx:
+	avra megadmx.s
 
 clean:
 	$(RM) *.obj *.hex *.cof
