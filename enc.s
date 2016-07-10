@@ -89,6 +89,7 @@ spi_send_wait:
 ;	Skip SPI buffer bytes
 ;	Count in r16
 ;	Clobbers r16, r17
+;	TODO Wait until ready, then send and return for faster handling
 spi_skip:
 		mov r17, r16
 spi_skip_1:

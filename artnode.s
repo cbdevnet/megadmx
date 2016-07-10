@@ -11,8 +11,10 @@ rjmp setup
 .equ SRAM_NEXTPACKET_LOW = (SRAM_START)
 .equ SRAM_NEXTPACKET_HIGH = (SRAM_START + 1)
 .equ SRAM_DATA_START = (SRAM_START + 20)
+.equ SRAM_DATA_END = (SRAM_DATA_START + 512)
 
 .include "enc.s"
+.include "dmx.s"
 
 setup:
 		cli
@@ -100,6 +102,7 @@ main:
 	;lds r16, (SRAM_DATA_START + 100)
 	andi r16, 0b00001111
 	out PORTC, r16
+	rcall dmx_transmit_packet
 	rjmp main
 
 detected:
