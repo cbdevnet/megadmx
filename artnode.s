@@ -92,6 +92,14 @@ main:
 	sbis PINB, PIN_CINT
 	rcall detected
 	;rcall xmit_dummy_pkt
+	ldi YL, low(SRAM_DATA_START + 100)
+	ldi YH, high(SRAM_DATA_START + 100)
+	ld r16, Y
+	;sbic UCSRA, UDRE
+	;out UDR, r16
+	;lds r16, (SRAM_DATA_START + 100)
+	andi r16, 0b00001111
+	out PORTC, r16
 	rjmp main
 
 detected:
