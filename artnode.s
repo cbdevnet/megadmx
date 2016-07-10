@@ -1,12 +1,12 @@
-.include "m32def.inc"
+.include "m8def.inc"
 .cseg
 .org 0
 rjmp setup
 
 .equ PIN_LED1 = 5
-.equ PIN_LED2 = 7
-.equ PIN_CSEL = 6
-.equ PIN_CINT = 4
+.equ PIN_LED2 = 4
+.equ PIN_CSEL = 0
+.equ PIN_CINT = 1
 
 .equ SRAM_NEXTPACKET_LOW = (SRAM_START)
 .equ SRAM_NEXTPACKET_HIGH = (SRAM_START + 1)
@@ -22,11 +22,19 @@ setup:
 	        ldi r16, high(RAMEND)
 	        out SPH, r16
 
-		; Set up I/O port
-		ldi r16, 0b11100010
+		; Set up debug port (PC)
+		ldi r16, 0xFF
+		out DDRC, r16
+
+		; Set up UART port (PD)
+		ldi r16, 0b00000010
 		out DDRD, r16
-		ldi r16, 0b01010000
-		out PORTD, r16
+
+		; Set up SPI/IO port (PB)
+		ldi r16, 0b00101101
+		out DDRB, r16
+		ldi r16, 0b00000011
+		out PORTB, r16
 
 		; Set up UART
 		ldi r16, 1
@@ -38,21 +46,15 @@ setup:
 		out UCSRC, r16
 		
 		; Set up SPI
-		ldi r16, 0b10100000
-		out DDRB, r16
 		ldi r16, (1 << SPE) | (1 << MSTR) ; | (1 << SPR0) | (1 << SPR1)
 		out SPCR, r16
-
-		; Set up visualizer port
-		ldi r16, 0xFF
-		out DDRA, r16
 
 		sei
 
 		; Set up the ENC
 		rcall enc_setup
 
-		rjmp testmain
+		;rjmp testmain
 
 		; Run the main loop
 		rjmp main
@@ -60,24 +62,26 @@ setup:
 stop:		rjmp stop
 
 led1on:
-		sbi PORTD, PIN_LED1
+		sbi PORTC, PIN_LED1
 		ret
 
 led2on:
-		sbi PORTD, PIN_LED2
+		sbi PORTC, PIN_LED2
 		ret
 
 led1off:
-		cbi PORTD, PIN_LED1
+		cbi PORTC, PIN_LED1
 		ret
 
 led2off:
-		cbi PORTD, PIN_LED2
+		cbi PORTC, PIN_LED2
 		ret
 
 
 testmain:
-	rcall xmit_dummy_pkt
+	;rcall xmit_dummy_pkt
+	ldi r16, 0x55
+	out UDR, r16
 	rjmp stop
 	rjmp testmain
 
@@ -85,11 +89,8 @@ main:
 	; Check for link
 	; Set LED
 	; Check for interrupt
-	sbis PIND, PIN_CINT
+	sbis PINB, PIN_CINT
 	rcall detected
-	;ldi YL, low(SRAM_DATA_START + 100)
-	;ldi YH, high(SRAM_DATA_START + 100)
-	;ld r8, Z
 	;rcall xmit_dummy_pkt
 	rjmp main
 
