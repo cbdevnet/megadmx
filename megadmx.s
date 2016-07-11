@@ -3,16 +3,19 @@
 .org 0
 rjmp setup
 
+; IO Pins
 .equ PIN_LED1 = 5
 .equ PIN_LED2 = 4
 .equ PIN_CSEL = 0
 .equ PIN_CINT = 1
 
+; SRAM Locations
 .equ SRAM_NEXTPACKET_LOW = (SRAM_START)
 .equ SRAM_NEXTPACKET_HIGH = (SRAM_START + 1)
 .equ SRAM_DATA_START = (SRAM_START + 20)
 .equ SRAM_DATA_END = (SRAM_DATA_START + 512)
 
+.include "aux.s"
 .include "enc.s"
 .include "dmx.s"
 
@@ -53,6 +56,9 @@ setup:
 
 		sei
 
+		; Zero all channel data
+		rcall dmx_init_storage
+
 		; Set up the ENC
 		rcall enc_setup
 
@@ -61,278 +67,173 @@ setup:
 		; Run the main loop
 		rjmp main
 
-stop:		rjmp stop
-
-led1on:
-		sbi PORTC, PIN_LED1
-		ret
-
-led2on:
-		sbi PORTC, PIN_LED2
-		ret
-
-led1off:
-		cbi PORTC, PIN_LED1
-		ret
-
-led2off:
-		cbi PORTC, PIN_LED2
-		ret
-
-
+;	Test main loop
 testmain:
-	;rcall xmit_dummy_pkt
-	ldi r16, 0x55
-	out UDR, r16
-	rjmp stop
-	rjmp testmain
-
-main:
-	; Check for link
-	; Set LED
-	; Check for interrupt
-	sbis PINB, PIN_CINT
-	rcall detected
-	;rcall xmit_dummy_pkt
-	ldi YL, low(SRAM_DATA_START + 100)
-	ldi YH, high(SRAM_DATA_START + 100)
-	ld r16, Y
-	;sbic UCSRA, UDRE
-	;out UDR, r16
-	;lds r16, (SRAM_DATA_START + 100)
-	andi r16, 0b00001111
-	out PORTC, r16
-	rcall dmx_transmit_packet
-	rjmp main
-
-detected:
-	rcall led2on
-	;rcall xmit_dummy_pkt
-	;rcall longdelay
-	rcall read_pkt
-	rcall enc_packet_ack
-	rcall enc_clearint
-	rcall led2off
-	ret
-
-xmit_dummy_pkt:
-	ldi r16, 46
-	rcall enc_sendpkt_prepare
-	rcall enc_writebuffer_start
-
-	; Control byte
-	ldi r16, 0
-	rcall spi_send
-
-	; Packet contents
-	ldi ZL, low(dummy_pkt << 1)
-	ldi ZH, high(dummy_pkt << 1)
-	ldi r16, 46
-	rcall spi_flash_xmit
-
-	rcall enc_disa
-	rcall enc_sendpkt_xmit
-	ret
-
-flashloop:
-	ldi ZL, low(str1 << 1)
-	ldi ZH, high(str1 << 1)
-	rcall uart_txflash
-	rjmp flashloop
-
-read_pkt:
-	ldi r16, REG_ERDPT
-	lds r17, SRAM_NEXTPACKET_LOW
-	lds r18, SRAM_NEXTPACKET_HIGH
-	rcall enc_writeword
-
-	rcall enc_readbuffer_start
-	
-	; Read next packet ptr
-	ldi r16, 0
-	rcall spi_send
-	in r16, SPDR
-	sts SRAM_NEXTPACKET_LOW, r16
-	ldi r16, 0
-	rcall spi_send
-	in r16, SPDR
-	sts SRAM_NEXTPACKET_HIGH, r16
-
-	; Read packet data length (r20/r21)
-	ldi r16, 0
-	rcall spi_send
-	in r20, SPDR
-	rcall spi_send
-	in r21, SPDR
-
-	; Read status vector
-	rcall spi_send
-	in r16, SPDR
-	andi r16, STATUS_RECV_OK
-	breq read_pkt_exit
-	ldi r16, 0
-	rcall spi_send
-
-	; Assert a complete Art-Net header
-	ldi r16, 0x3B
-	ldi r17, 0
-	cp r20, r16
-	cpc r21, r17
-	brlt read_pkt_exit
-
-	; TODO Calculate proper offset into packet for Art-Net header
-	; instead of reading unnecessary data
-
-	; TODO Make sure to not read over packet length
-
-	; FIXME This could all be done better by interleaving SPI reads
-	; with stores
-
-	; Skip to port bytes
-	ldi r16, 0x22
-	rcall spi_skip
-
-	ldi ZL, low(artnet_hdr_1 << 1)
-	ldi ZH, high(artnet_hdr_1 << 1)
-	ldi r16, 4
-	rcall spi_compare
-
-	tst r16
-	brne read_pkt_exit
-
-	ldi r16, 4
-	rcall spi_skip
-
-	ldi ZL, low(artnet_hdr_2 << 1)
-	ldi ZH, high(artnet_hdr_2 << 1)
-	ldi r16, 10
-	rcall spi_compare
-
-	tst r16
-	brne read_pkt_exit
-
-	rcall led1on
-
-	ldi r16, 4
-	rcall spi_skip
-
-	ldi r16, 0
-	; Read Universe to r1/r2 //TODO compare
-	rcall spi_send
-	in r1, SPDR
-	rcall spi_send
-	in r2, SPDR
-
-	; Read number of channels to r17/r18
-	rcall spi_send
-	in r17, SPDR
-	rcall spi_send
-	in r18, SPDR
-
-	; TODO Check for #channels <= 512
-
-	; Read channel data
-	ldi XL, low(SRAM_DATA_START)
-	ldi XH, high(SRAM_DATA_START)
-	ldi r19, 0
-	ldi r20, 0
-	
-	out SPDR, r19
-read_pkt_channel_wait:
-	sbis SPSR, SPIF
-	rjmp read_pkt_channel_wait
-	in r16, SPDR
-	out SPDR, r19
-	st X+, r16
-	subi r18, 1
-	sbci r17, 0
-	cp r18, r19
-	cpc r17, r20
-	brne read_pkt_channel_wait
-
-	; FIXME This reads one byte after the packet
-
-	rcall led1off
-
-read_pkt_exit:
-	; End buffer transfer
-	rcall enc_disa
-
-	; Update RX read pointer to free memory
-	ldi r16, REG_ERXRDPT
-	lds r17, SRAM_NEXTPACKET_LOW
-	lds r18, SRAM_NEXTPACKET_HIGH
-	cpi r17, low(ENC_RX_START)
-	brne read_pkt_exit_calc
-	cpi r18, high(ENC_RX_START)
-	brne read_pkt_exit_calc
-	ldi r17, low(ENC_RX_END)
-	ldi r18, high(ENC_RX_END)
-	rjmp read_pkt_exit_write
-read_pkt_exit_calc:
-	subi r17, 1
-	sbci r18, 0
-read_pkt_exit_write:
-	rcall enc_writeword
-	ret
-
-;	Transmit string from flash via UART
-;	String address << 1 in ZH/ZL hi/lo
-;	Clobbers: r16
-uart_txflash:
-		; Load data from flash
-		lpm r16, Z+
-		; Test for string end
-		tst r16
-		breq uart_txflash_end
-		; Wait until buffer ready
-uart_txflash_wait:
-		sbis UCSRA, UDRE
-		rjmp uart_txflash_wait
-		; Output byte
+		;rcall xmit_dummy_pkt
+		ldi r16, 0x55
 		out UDR, r16
-		rjmp uart_txflash
-uart_txflash_end:
-		; Make sure transmission is done
-		sbis UCSRA, UDRE
-		rjmp uart_txflash_end
+		rjmp stop
+		rjmp testmain
+
+; 	Production main loop
+main:
+		; Check for interrupt
+		sbis PINB, PIN_CINT
+		rcall pkt_incoming
+		; Load channel 100 data to PORTC
+		ldi YL, low(SRAM_DATA_START + 100)
+		ldi YH, high(SRAM_DATA_START + 100)
+		ld r16, Y
+		andi r16, 0b00001111
+		out PORTC, r16
+		; Transmit DMX packet
+		rcall dmx_transmit_packet
+		rjmp main
+
+;	Handle incoming packet
+pkt_incoming:
+		rcall led2on
+		rcall read_pkt
+		rcall enc_packet_ack
+		rcall enc_clearint
+		rcall led2off
 		ret
 
-;	Transmit flash data to SPI
-;	Address << 1 in ZH/ZL
-;	Length in r16
-;	Clobbers r16, r17
-spi_flash_xmit:
-		mov r17, r16
-spi_flash_xmit_1:
-		tst r17
-		breq spi_flash_xmit_end
-		lpm r16, Z+
+;	Transmit test UDP packet
+xmit_dummy_pkt:
+		ldi r16, 46
+		rcall enc_sendpkt_prepare
+		rcall enc_writebuffer_start
+		; Control byte
+		ldi r16, 0
 		rcall spi_send
-		dec r17
-		rjmp spi_flash_xmit_1
-spi_flash_xmit_end:
+		; Packet contents
+		ldi ZL, low(dummy_pkt << 1)
+		ldi ZH, high(dummy_pkt << 1)
+		ldi r16, 46
+		rcall spi_flash_xmit
+		rcall enc_disa
+		rcall enc_sendpkt_xmit
 		ret
 
-;	Delay functions
-;	Clobbers r16, r17
-longdelay:
-		ldi r16, 0xFF
-longdelay_inner:
-		rcall delay
-		dec r16
-		brne longdelay_inner
+;	Read and process received packet
+read_pkt:
+		; Write next packet pointer
+		ldi r16, REG_ERDPT
+		lds r17, SRAM_NEXTPACKET_LOW
+		lds r18, SRAM_NEXTPACKET_HIGH
+		rcall enc_writeword
+		; Begin reading
+		rcall enc_readbuffer_start
+		; Read next packet pointer and store to SRAM
+		ldi r16, 0
+		rcall spi_send
+		in r16, SPDR
+		sts SRAM_NEXTPACKET_LOW, r16
+		ldi r16, 0
+		rcall spi_send
+		in r16, SPDR
+		sts SRAM_NEXTPACKET_HIGH, r16
+		; Read packet data length (r20/r21)
+		ldi r16, 0
+		rcall spi_send
+		in r20, SPDR
+		rcall spi_send
+		in r21, SPDR
+		; Read status vector
+		rcall spi_send
+		in r16, SPDR
+		andi r16, STATUS_RECV_OK
+		breq read_pkt_exit
+		ldi r16, 0
+		rcall spi_send
+		; Assert a complete Art-Net header ( > 0x3B bytes)
+		ldi r16, 0x3B
+		ldi r17, 0
+		cp r20, r16
+		cpc r21, r17
+		brlt read_pkt_exit
+		; TODO Calculate proper offset into packet for Art-Net header
+		; instead of reading unnecessary data
+		; TODO Make sure to not read over packet length
+		; FIXME This could all be done better by interleaving SPI reads
+		; with stores
+		; Skip to port bytes
+		ldi r16, 0x22
+		rcall spi_skip
+		; Compare source/destination ports
+		ldi ZL, low(artnet_hdr_1 << 1)
+		ldi ZH, high(artnet_hdr_1 << 1)
+		ldi r16, 4
+		rcall spi_compare
+		tst r16
+		brne read_pkt_exit
+		; Skip to Art-Net header
+		ldi r16, 4
+		rcall spi_skip
+		; Compare Art-Net header
+		ldi ZL, low(artnet_hdr_2 << 1)
+		ldi ZH, high(artnet_hdr_2 << 1)
+		ldi r16, 10
+		rcall spi_compare
+		tst r16
+		brne read_pkt_exit
+		; If Art-Net packet, turn on LED
+		rcall led1on
+		ldi r16, 4
+		rcall spi_skip
+		ldi r16, 0
+		; Read Universe to r1/r2 //TODO compare
+		rcall spi_send
+		in r1, SPDR
+		rcall spi_send
+		in r2, SPDR
+		; Read number of channels to r17/r18
+		rcall spi_send
+		in r17, SPDR
+		rcall spi_send
+		in r18, SPDR
+		; TODO Check for #channels <= 512
+		; Read channel data
+		ldi XL, low(SRAM_DATA_START)
+		ldi XH, high(SRAM_DATA_START)
+		ldi r19, 0
+		ldi r20, 0	
+		out SPDR, r19
+read_pkt_channel_wait:
+		sbis SPSR, SPIF
+		rjmp read_pkt_channel_wait
+		in r16, SPDR
+		out SPDR, r19
+		st X+, r16
+		subi r18, 1
+		sbci r17, 0
+		cp r18, r19
+		cpc r17, r20
+		brne read_pkt_channel_wait
+		; FIXME This reads one byte after the packet
+		rcall led1off
+read_pkt_exit:
+		; End buffer transfer
+		rcall enc_disa
+		; Update RX read pointer to free memory
+		ldi r16, REG_ERXRDPT
+		lds r17, SRAM_NEXTPACKET_LOW
+		lds r18, SRAM_NEXTPACKET_HIGH
+		; Calculate odd next packet pointer (see ENC28J60 errata)
+		cpi r17, low(ENC_RX_START)
+		brne read_pkt_exit_calc
+		cpi r18, high(ENC_RX_START)
+		brne read_pkt_exit_calc
+		ldi r17, low(ENC_RX_END)
+		ldi r18, high(ENC_RX_END)
+		rjmp read_pkt_exit_write
+read_pkt_exit_calc:
+		subi r17, 1
+		sbci r18, 0
+read_pkt_exit_write:
+		rcall enc_writeword
 		ret
-
-delay:
-	        ldi r17, 0xFF
-delay_inner:
-	        dec r17
-	        brne delay_inner
-	        ret
-
-
-str1:	.DB "Yay this seems to work!", 0x00
 
 dummy_pkt:
 	; MAC
