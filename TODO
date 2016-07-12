@@ -1,0 +1,6 @@
+Check interpacket time
+Fix reception clog-up
+Add display
+Implement ARP
+Implement ArtPoll
+Write proper documentation
