@@ -1,24 +1,19 @@
 ;	Transmit the DMX break marker
 ;	Clobbers: r16, r17
 dmx_transmit_break:
-		; Step down UART speed
-		ldi r16, 10
-		out UBRRL, r16
-		; Transmit zero for BREAK
-		ldi r16, 0
-		out UDR, r16
-		ldi r16, 1
-		; Wait until BREAK done
-dmx_transmit_break_1:
+		; Wait for finished TX
 		sbis UCSRA, UDRE
-		rjmp dmx_transmit_break_1
-		; Short delay for start code
-		ldi r17, 10
-dmx_transmit_break_2:
-		dec r17
-		brne dmx_transmit_break_2
-		; Reset UART speed to 250kBit/s
-		out UBRRL, r16
+		rjmp dmx_transmit_break
+		; Pull TX low for BREAK
+		cbi UCSRB, TXEN
+		; BREAK
+		rcall delay
+		sbi UCSRB, TXEN
+		; Transmit MAB
+		ldi r16, 15
+dmx_transmit_break_mab:
+		dec r16
+		brne dmx_transmit_break_mab
 		ret
 
 ;	Transmit single byte via DMX
@@ -38,10 +33,11 @@ dmx_transmit_byte_1:
 ;	Transmit a complete DMX packet
 ;	Clobbers: r16, r17, r18, r19, YL, YH
 dmx_transmit_packet:
-		; BREAK / MAB / Startcode
+		; BREAK / MAB
 		rcall dmx_transmit_break
-		;ldi r16, 0
-		;rcall dmx_transmit_byte
+		; Send start code
+		ldi r16, 0
+		rcall dmx_transmit_byte
 		ldi YL, low(SRAM_DATA_START)
 	        ldi YH, high(SRAM_DATA_START)
 		ldi r18, low(SRAM_DATA_END)
@@ -54,8 +50,13 @@ dmx_transmit_packet_1:
 		cpc YH, r19
 		brlt dmx_transmit_packet_1
 		; Last channel
-		ld r16, Y
-		rcall dmx_transmit_byte
+		;ld r16, Y
+		;rcall dmx_transmit_byte
+		; Interpacket
+		ldi r16, 200
+dmx_transmit_packet_ipt:
+		dec r16
+		brne dmx_transmit_packet_ipt
 		ret
 
 ;	Initialize data storage to all zeros
