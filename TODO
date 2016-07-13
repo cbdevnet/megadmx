@@ -4,3 +4,4 @@ Add display
 Implement ARP
 Implement ArtPoll
 Write proper documentation
+Actually check most ArtNet header fields

@@ -20,13 +20,14 @@ dmx_transmit_break_mab:
 ;	Value in r16
 ;	Clobbers: r17
 dmx_transmit_byte:
+		sbis UCSRA, UDRE
+		rjmp dmx_transmit_byte
 		; Delay for Inter-Frame-Time
-		ldi r17, 130
+		; FIXME Increasing this delay seems to modify BREAK times
+		ldi r17, 125
 dmx_transmit_byte_1:
 		dec r17
 		brne dmx_transmit_byte_1
-		sbis UCSRA, UDRE
-		rjmp dmx_transmit_byte
 		out UDR, r16
 		ret
 
@@ -49,11 +50,13 @@ dmx_transmit_packet_1:
 		cp YL, r18
 		cpc YH, r19
 		brlt dmx_transmit_packet_1
-		; Last channel
-		;ld r16, Y
-		;rcall dmx_transmit_byte
 		; Interpacket
-		ldi r16, 200
+		; FIXME UDRE fires at the start of a byte, not at the end
+		; This necessitates a longer delay
+dmx_transmit_packet_finalize:
+		sbis UCSRA, UDRE
+		rjmp dmx_transmit_packet_finalize
+		ldi r16, 150
 dmx_transmit_packet_ipt:
 		dec r16
 		brne dmx_transmit_packet_ipt

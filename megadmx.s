@@ -81,8 +81,8 @@ main:
 		sbis PINB, PIN_CINT
 		rcall pkt_incoming
 		; Load channel 100 data to PORTC
-		ldi YL, low(SRAM_DATA_START + 100)
-		ldi YH, high(SRAM_DATA_START + 100)
+		ldi YL, low(SRAM_DATA_START + 1)
+		ldi YH, high(SRAM_DATA_START + 1)
 		ld r16, Y
 		andi r16, 0b00001111
 		out PORTC, r16
