@@ -5,3 +5,6 @@ Implement ARP
 Implement ArtPoll
 Write proper documentation
 Actually check most ArtNet header fields
+Use TXC bit
+Wait for SPI complete before calling enc_disa
+Store config in EEPROM

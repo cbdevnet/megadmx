@@ -70,11 +70,11 @@
 
 ;	Enable/Disable ENC Chip
 enc_ena:
-		cbi PORTB, PIN_CSEL
+		cbi PORTB, PIN_ENC_SEL
 		ret
 
 enc_disa:
-		sbi PORTB, PIN_CSEL
+		sbi PORTB, PIN_ENC_SEL
 		ret
 
 ;	Send arbitrary byte via SPI

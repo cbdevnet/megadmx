@@ -1,7 +1,8 @@
 .PHONY: all clean
 
 # Programmer options
-PROGRAMMER=-c stk500v2 -P /dev/ttyACM0
+#PROGRAMMER=-c stk500v2 -P /dev/ttyACM0
+PROGRAMMER=-c usbasp 
 
 # Mega8
 PART=m8
