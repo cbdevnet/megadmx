@@ -15,3 +15,10 @@ Documentation TBD
 	ENC SPI		<->	ATmega SPI
 	ATmega SS	<->	HIGH
 	ENC RST		<->	HIGH
+	ENTER button	<->	PD0
+	UP button	<->	PD2
+	DOWN button	<->	PD3
+	SSD1306 SPI	<->	ATmega SPI
+	SSD1306 CS	<->	PC3
+	SSD1306 DC	<->	PC2
+	SSD1306 RES	<->	PC1
