@@ -8,7 +8,7 @@ Needed:
 SRAM
 0	next packet ptr low
 1	next packet ptr high
-2
+2	menu position
 3
 4
 5

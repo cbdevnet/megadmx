@@ -11,10 +11,14 @@ rjmp setup
 .equ PIN_DISP_SEL = 3
 .equ PIN_DISP_MODE = 2
 .equ PIN_DISP_RESET = 1
+.equ PIN_INPUT_ENTER = 0
+.equ PIN_INPUT_UP = 2
+.equ PIN_INPUT_DOWN = 3
 
 ; SRAM Locations
 .equ SRAM_NEXTPACKET_LOW = (SRAM_START)
 .equ SRAM_NEXTPACKET_HIGH = (SRAM_START + 1)
+.equ SRAM_MENU_POSITION = (SRAM_START + 2)
 .equ SRAM_DATA_START = (SRAM_START + 20)
 .equ SRAM_DATA_END = (SRAM_DATA_START + 512)
 
@@ -22,6 +26,7 @@ rjmp setup
 .include "enc.s"
 .include "dmx.s"
 .include "ssd1306.s"
+.include "menu.s"
 
 setup:
 		cli
@@ -37,9 +42,11 @@ setup:
 		ldi r16, 0b00001110
 		out PORTC, r16
 
-		; Set up UART port (PD)
+		; Set up UART/INPUT port (PD)
 		ldi r16, 0b00000010
 		out DDRD, r16
+		ldi r16, 0b00001101
+		out PORTD, r16
 
 		; Set up SPI/IO port (PB)
 		ldi r16, 0b00101101
@@ -65,10 +72,16 @@ setup:
 		; Zero all channel data
 		rcall dmx_init_storage
 
+		; Start the display and draw initial menu
+		ldi r16, 0
+		sts SRAM_MENU_POSITION, r16
+		rcall disp_setup
+		rcall menu_draw
+
 		; Set up the ENC
 		rcall enc_setup
 
-		rjmp testmain
+		;rjmp testmain
 
 		; Run the main loop
 		rjmp main
@@ -76,7 +89,6 @@ setup:
 ;	Test main loop
 testmain:
 		;rcall xmit_dummy_pkt
-		rcall disp_setup
 		ldi ZL, low(cblogo << 1)
 		ldi ZH, high(cblogo << 1)
 		ldi r16, 32
@@ -126,13 +138,17 @@ main:
 		; Check for interrupt
 		sbis PINB, PIN_ENC_INT
 		rcall pkt_incoming
-		; Load channel 100 data to PORTC
-		;ldi YL, low(SRAM_DATA_START + 1)
-		;ldi YH, high(SRAM_DATA_START + 1)
-		;ld r16, Y
-		;andi r16, 0b00000011
-		;ori r16, 0b00001000
-		;out PORTC, r16
+
+		; Check for key presses
+		sbis PIND, PIN_INPUT_ENTER
+		rcall debounce_enter
+
+		sbis PIND, PIN_INPUT_UP
+		rcall debounce_up
+
+		sbis PIND, PIN_INPUT_DOWN
+		rcall debounce_down
+
 		; Transmit DMX packet
 		rcall dmx_transmit_packet
 		rjmp main
@@ -147,6 +163,7 @@ pkt_incoming:
 		ret
 
 ;	Transmit test UDP packet
+;	Clobbers: r16
 xmit_dummy_pkt:
 		ldi r16, 46
 		rcall enc_sendpkt_prepare
@@ -164,6 +181,7 @@ xmit_dummy_pkt:
 		ret
 
 ;	Read and process received packet
+;	Clobbers r1, r2, r16, r17, r18, r19, r20, r21
 read_pkt:
 		; Write next packet pointer
 		ldi r16, REG_ERDPT
