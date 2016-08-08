@@ -55,15 +55,19 @@ menu_draw_title_gfx:
 		; Fixed values
 		ldi r17, 3
 		ldi r18, 0
-		ldi r19, 3
+		ldi r19, 4
 		rcall disp_gfx
 		; Clear leftover area
 		mov r16, r4
+		tst r16
+		breq menu_draw_title_done
 		ldi r17, 3
 		ldi r18, 96
 		sub r18, r16
-		ldi r19, 3
+		ldi r19, 4
 		rcall disp_clear_rect
+menu_draw_title_done:
+		; Draw parameter
 		ret
 
 menu_titles:
