@@ -1,11 +1,14 @@
 # megadmx
-ArtNet to DMX bridge using an ATmega8 and an ENC28J60
+Minimalistic DMX & ArtNet projects using the ATmega8
+
+* ArtNet to DMX bridge using an ATmega8 and an ENC28J60
+* DMX receiver with PWM outputs using an ATmega8 and a MAX481
 
 Documentation TBD
 
 ## Hardware Setup
 
-### ATmega8
+### Bridge
 	MAX485 DI	<->	PD1 (UART TX)
 	MAX485 DE/RE	<->	HIGH
 	LED1		<->	PC5
@@ -22,3 +25,9 @@ Documentation TBD
 	SSD1306 CS	<->	PC3
 	SSD1306 DC	<->	PC2
 	SSD1306 RES	<->	PC1
+
+### Receiver
+	MAX481 RO	<->	PD0 (UART RX)
+	MAX481 DI/DE/RE <->	LOW
+	DMX ADDR	<->	PC012345 PD567
+	PWM OUT		<->	PB123
