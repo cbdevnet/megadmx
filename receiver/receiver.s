@@ -49,22 +49,42 @@ setup:
 main:
 		rcall read_addr
 		; Wait for BREAK
+		rcall scan_break
+main_reent:
 		; In MAB, enable RX
+		ldi r16, (1 << RXEN)	; 1C
+		out UCSRB, r16		; 1C
+		; MAB is at minimum 4 usec -> 32 cycles
 		; Read startcode
 		; Read bytes until address
 		; Read bytes until framing error
+		; Disengage RX
+		ldi r16, 0		; 1C
+		out UCSRB, r16		; 1C
 		; Run rescan_break
-		sbi PORTB, 1
-		rjmp main
+		rcall rescan_break
+		rjmp main_reent
 
 scan_break:
 		; 8 cycles per usec
 		; 88 usec BREAK
 		; => 704 cycles
-		ldi r16, 0x02
-		ldi r17, 0xC0
-		; TODO return in MAB
-		ret
+		; -1 cycle setup
+		ldi r17, 0		; 1C
+scan_break_1:
+		nop			; 1C
+		nop			; 1C
+		nop			; 1C
+		nop			; 1C
+		inc r17			; 1C
+		sbis PINB, 0		; 1C (2C @ skip)
+		rjmp scan_break_1	; 2C
+		cpi r17, 88		; 1C
+		; Test whether break condition met
+		; else wait for next break and do it again
+		brlo scan_break		; 1C if false, 2 if true
+		; Return 4 cycles into MAB
+		ret			; 4C
 
 rescan_break:
 		; First stop bit framing error, already 40 usec into BREAK
