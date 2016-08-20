@@ -52,17 +52,44 @@ main:
 		rcall scan_break
 main_reent:
 		; In MAB, enable RX
+		; MAB is at minimum 4 usec -> 32 cycles
 		ldi r16, (1 << RXEN)	; 1C
 		out UCSRB, r16		; 1C
-		; MAB is at minimum 4 usec -> 32 cycles
+
+		; Channel counter
+		ldi r24, 0
+		ldi r25, 0
+
+main_read_byte:
+		; Check for framing errors (end of packet)
+		sbic UCSRA, FE
+		rjmp main_fe
+		; Check for received byte
+		sbic UCSRA, RXC
+		rjmp main_byte
+		rjmp main_read_byte
+
+main_byte:
 		; Read startcode
-		; Read bytes until address
-		; Read bytes until framing error
+		; Check if match for address
+		; Increase channel counter
+		sbi PORTB, 2
+		cbi PORTB, 2
+		in r16, UDR
+		rjmp main_read_byte
+
+main_fe:
+		sbi PORTB, 1
+
 		; Disengage RX
 		ldi r16, 0		; 1C
 		out UCSRB, r16		; 1C
+
+		cbi PORTB, 1
+
 		; Run rescan_break
-		rcall rescan_break
+		;rcall rescan_break
+		rcall scan_break
 		rjmp main_reent
 
 scan_break:
@@ -77,13 +104,13 @@ scan_break_1:
 		nop			; 1C
 		nop			; 1C
 		inc r17			; 1C
-		sbis PINB, 0		; 1C (2C @ skip)
+		sbis PIND, 0		; 1C (2C @ skip)
 		rjmp scan_break_1	; 2C
 		cpi r17, 88		; 1C
 		; Test whether break condition met
 		; else wait for next break and do it again
 		brlo scan_break		; 1C if false, 2 if true
-		; Return 4 cycles into MAB
+		; Return (at min) 10 cycles into MAB (16 at max)
 		ret			; 4C
 
 rescan_break:
