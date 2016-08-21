@@ -89,8 +89,7 @@ main_fe:
 		cbi PORTB, 1
 
 		; Run rescan_break
-		;rcall rescan_break
-		rcall scan_break
+		rcall rescan_break
 		rjmp main_reent
 
 scan_break:
@@ -115,9 +114,20 @@ scan_break_1:
 		ret			; 4C
 
 rescan_break:
+		; Might instead just make scan_break interval programmable
 		; First stop bit framing error, already 40 usec into BREAK
 		; If any data in next 48 usec, run scan_break
-		; Wait 384 cycles, then return for MAB
+		ldi r17, 0		; 1C
+rescan_break_1:
+		nop
+		nop
+		nop
+		nop
+		inc r17
+		sbis PIND, 0
+		rjmp rescan_break_1
+		cpi r17, 48
+		brlo scan_break
 		ret
 
 read_addr:
