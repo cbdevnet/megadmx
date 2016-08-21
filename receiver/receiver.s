@@ -61,15 +61,16 @@ main_reent:
 		ldi r25, 0
 
 main_read_byte:
-		; Check for framing errors (end of packet)
-		sbic UCSRA, FE
-		rjmp main_fe
 		; Check for received byte
-		sbic UCSRA, RXC
-		rjmp main_byte
+		sbis UCSRA, RXC
 		rjmp main_read_byte
 
 main_byte:
+		in r16, UCSRA
+		; Check for framing errors (end of packet)
+		andi r16, (1 << FE)
+		brne main_fe
+
 		; Read startcode
 		; Check if match for address
 		; Increase channel counter
