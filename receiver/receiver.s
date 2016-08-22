@@ -3,6 +3,8 @@
 .org 0
 rjmp setup
 
+.EQU CHANNELS = 3
+
 setup:
 		cli
 		; Create stack
@@ -34,7 +36,6 @@ setup:
 		out UBRRL, r16
 		ldi r16, (1 << RXEN)
 		;out UCSRB, r16
-		;ldi r16, (1 << URSEL) | (1 << UCSZ1)
 		ldi r16, (1 << URSEL) | (1 << UCSZ0) | (1 << UCSZ1) | (1 << USBS)
 		out UCSRC, r16
 		
@@ -47,7 +48,18 @@ setup:
 
 ; 	Production main loop
 main:
-		rcall read_addr
+		; Stop reception
+		ldi r16, 0		; 1C
+		out UCSRB, r16		; 1C
+
+		; Read device address
+		;rcall read_addr
+		ldi r16, 0
+		mov r1, r16
+		ldi r16, 3
+		mov r2, r16
+		rcall read_addr_2
+
 		; Wait for BREAK
 		rcall scan_break
 main_reent:
@@ -60,33 +72,85 @@ main_reent:
 		ldi r24, 0
 		ldi r25, 0
 
+		; Start address
+		mov r26, r2
+		mov r27, r1
+
+		; End address
+		mov r28, r4
+		mov r29, r3
+
 main_read_byte:
 		; Check for received byte
 		sbis UCSRA, RXC
-		rjmp main_read_byte
+		rjmp main_read_byte	; 2C
 
 main_byte:
+		; One byte-time of processing time (44us)
+		; -> 352
 		in r16, UCSRA
 		; Check for framing errors (end of packet)
 		andi r16, (1 << FE)
 		brne main_fe
+		ldi r17, 0
 
-		; Read startcode
-		; Check if match for address
-		; Increase channel counter
-		sbi PORTB, 2
-		cbi PORTB, 2
+		; Read data
 		in r16, UDR
-		rjmp main_read_byte
+
+		; Check for startcode
+		cpi r24, 0
+		cpc r25, r17
+		breq main_startcode
+
+		; Check if over start address
+		cp r24, r26
+		cpc r25, r27
+		brlo main_byte_done
+
+		; Check if over end address
+		cp r24, r28
+		cpc r25, r29
+		brsh main_byte_done
+		
+		; Calculate delta (address - start)
+		mov r19, r25
+		mov r18, r24
+
+		sub r18, r2
+		sbc r19, r1
+
+		; Handle channel
+		cpi r18, 0
+		breq main_handle_c1
+		cpi r18, 1
+		breq main_handle_c2
+		cpi r18, 2
+		breq main_handle_c3
+		rjmp main_byte_done
+
+main_handle_c1:
+		rjmp main_byte_done
+main_handle_c2:
+		rjmp main_byte_done
+main_handle_c3:
+		rjmp main_byte_done
+
+main_byte_done:
+		; Increase channel counter
+		adiw r25:r24, 1		; 2C
+		rjmp main_read_byte	; 2C
+
+main_startcode:
+		; Read startcode
+		cpi r16, 0
+		; If startcode not 0, rescan for BREAK
+		brne main
+		rjmp main_byte_done
 
 main_fe:
-		sbi PORTB, 1
-
 		; Disengage RX
 		ldi r16, 0		; 1C
 		out UCSRB, r16		; 1C
-
-		cbi PORTB, 1
 
 		; Run rescan_break
 		rcall rescan_break
@@ -145,4 +209,11 @@ read_addr_1:
 		andi r17, 0b11000000
 		or r16, r17
 		mov r2, r16
+read_addr_2:
+		; Calculate end address
+		mov r25, r1
+		mov r24, r2
+		adiw r25:r24, CHANNELS
+		mov r3, r25
+		mov r4, r24
 		ret

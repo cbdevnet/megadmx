@@ -1,0 +1,3 @@
+Test nonzero startcode handling
+Test disconnect in rescan_break
+Test early transmission (short BREAK)
