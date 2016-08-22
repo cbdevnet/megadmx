@@ -40,7 +40,15 @@ setup:
 		out UCSRC, r16
 		
 		; Set up PWM channels
-
+		; A/B phase correct PWM
+		ldi r16, (1 << COM1A1 | 0 << COM1A0 | 1 << COM1B1 | 0 << COM1B0 | 1 << WGM10)
+		out TCCR1A, r16
+		; No clock prescaler
+		ldi r16, (1 << CS10)
+		out TCCR1B, r16
+		; Timer2 mode
+		ldi r16, (0 << WGM21 | 1 << WGM20 | 1 << COM21 | 1 << CS20)
+		out TCCR2, r16
 		sei
 
 		; Run the main loop
@@ -56,7 +64,7 @@ main:
 		;rcall read_addr
 		ldi r16, 0
 		mov r1, r16
-		ldi r16, 3
+		ldi r16, 24
 		mov r2, r16
 		rcall read_addr_2
 
@@ -129,10 +137,13 @@ main_byte:
 		rjmp main_byte_done
 
 main_handle_c1:
+		out OCR1AL, r16
 		rjmp main_byte_done
 main_handle_c2:
+		out OCR1BL, r16
 		rjmp main_byte_done
 main_handle_c3:
+		out OCR2, r16
 		rjmp main_byte_done
 
 main_byte_done:
