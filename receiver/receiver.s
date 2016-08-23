@@ -20,7 +20,7 @@ setup:
 		out PORTB, r16
 
 		; Set up UART/INPUT port (PD)
-		ldi r16, 0b00000000
+		ldi r16, 0b00000010
 		out DDRD, r16
 		ldi r16, 0b11100001
 		out PORTD, r16
@@ -61,12 +61,12 @@ main:
 		out UCSRB, r16		; 1C
 
 		; Read device address
-		;rcall read_addr
-		ldi r16, 0
-		mov r1, r16
-		ldi r16, 24
-		mov r2, r16
-		rcall read_addr_2
+		rcall read_addr
+		;ldi r16, 0
+		;mov r1, r16
+		;ldi r16, 24
+		;mov r2, r16
+		;rcall read_addr_2
 
 		; Wait for BREAK
 		rcall scan_break
@@ -164,7 +164,8 @@ main_fe:
 		out UCSRB, r16		; 1C
 
 		; Run rescan_break
-		rcall rescan_break
+		rcall read_addr
+		rcall rescan_break	; 3/4C
 		rjmp main_reent
 
 scan_break:
@@ -201,30 +202,31 @@ rescan_break_1:
 		inc r17
 		sbis PIND, 0
 		rjmp rescan_break_1
-		cpi r17, 48
+		; Subtract 3 usec for read_addr
+		cpi r17, 45
 		brlo scan_break
 		ret
 
 read_addr:
 		; Clear address high byte
-		ldi r16, 0
-		mov r1, r16
-		in r16, PINC
-		in r17, PIND
-		lsl r17
-		brcc read_addr_1
-		ldi r16, 1
-		mov r1, r16
+		ldi r16, 0		; 1C
+		mov r1, r16		; 1C
+		in r16, PINC		; 1C
+		in r17, PIND		; 1C
+		lsl r17			; 1C
+		brcc read_addr_1	; 1C false 2C true
+		ldi r16, 1		; 1C
+		mov r1, r16		; 1C
 read_addr_1:
-		andi r16, 0b00111111
-		andi r17, 0b11000000
-		or r16, r17
-		mov r2, r16
+		andi r16, 0b00111111	; 1C
+		andi r17, 0b11000000	; 1C
+		or r16, r17		; 1C
+		mov r2, r16		; 1C
 read_addr_2:
 		; Calculate end address
-		mov r25, r1
-		mov r24, r2
-		adiw r25:r24, CHANNELS
-		mov r3, r25
-		mov r4, r24
-		ret
+		mov r25, r1		; 1C
+		mov r24, r2		; 1C
+		adiw r25:r24, CHANNELS	; 2C
+		mov r3, r25		; 1C
+		mov r4, r24		; 1C
+		ret			; 4C
