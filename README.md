@@ -3,6 +3,7 @@ Minimalistic DMX & ArtNet projects using the ATmega8
 
 * ArtNet to DMX bridge using an ATmega8 and an ENC28J60
 * DMX receiver with PWM outputs using an ATmega8 and a MAX481
+* DMX receiver with PWM outputs using an ATtiny13 and a MAX481
 
 Documentation TBD
 
@@ -26,8 +27,13 @@ Documentation TBD
 	SSD1306 DC	<->	PC2
 	SSD1306 RES	<->	PC1
 
-### Receiver
+### Receiver (mega8)
 	MAX481 RO	<->	PD0 (UART RX)
 	MAX481 DI/DE/RE <->	LOW
 	DMX ADDR	<->	PC012345 PD567
 	PWM OUT		<->	PB123
+
+### Receiver (tiny13)
+	MAX481 RO	<->	PB3
+	MAX481 DI/DE/RE <->	LOW
+	PWM OUT		<->	PB01
