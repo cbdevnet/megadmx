@@ -187,7 +187,9 @@ main_byte_done:
 		ldi r16, 60
 		rjmp main_rescan
 
-; FIXME in rescan, if nothing found default to full scan
+scan_break_full:
+		; If rescan failed, scan for full break
+		ldi r16, 104			; ceil(88 usec * 9.6 cycles) / 8  +- 4
 scan_break:
 		ldi r17, 0
 scan_break_1:
@@ -199,5 +201,5 @@ scan_break_1:
 		sbis PINB, DMXPIN	; 1C false 2 true
 		rjmp scan_break_1	; 2C
 		cp r17, r16		; 1C
-		brlo scan_break		; 1C false 2 true
+		brlo scan_break_full	; 1C false 2 true
 		ret
