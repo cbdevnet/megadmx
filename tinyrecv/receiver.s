@@ -3,8 +3,8 @@
 .org 0
 rjmp setup
 
-.EQU ADDRESS1 = 301
-.EQU ADDRESS2 = 512
+.EQU ADDRESS1 = 10
+.EQU ADDRESS2 = 15
 .EQU DMXPIN = 3
 ; 9.6 cycles / usec
 ; TODO simple address setting (press button, set channel)
@@ -70,25 +70,25 @@ main_read_byte:
 main_read_byte_sample_bit:
 		in r17, PINB			; Sample pin
 		andi r17, (1 << DMXPIN)		; Sanitize input
-		ldi r20, 0			; Zero HI counter
-		mov r15, r20
+		clr r15				; Zero HI counter
 		cpse r17, r14			; Increase if 1
 		inc r15
+		inc r18				; Increase bit counter
 		nop
 		nop
-		inc r18
 		nop
-		in r17, PINB
+		nop
+
+		in r17, PINB			; Second sample
 		andi r17, (1 << DMXPIN)
 		cpse r17, r14
 		inc r15
-
 		nop
 		nop
 		nop
 		nop
 
-		in r17, PINB
+		in r17, PINB			; Third sample
 		andi r17, (1 << DMXPIN)
 		cpse r17, r14
 		inc r15
