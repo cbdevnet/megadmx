@@ -37,3 +37,7 @@ Documentation TBD
 	MAX481 RO	<->	PB3
 	MAX481 DI/DE/RE <->	LOW
 	PWM OUT		<->	PB01
+	ADDRSWITCH	<->	PB2
+
+	Hold the ADDRSWITCH down to set the channel addresses
+	to the first two DMX channels with value > 127
