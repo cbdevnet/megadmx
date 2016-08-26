@@ -1,4 +1,4 @@
-.include "m8def.inc"
+.include "../m8def.inc"
 .cseg
 .org 0
 rjmp setup
@@ -23,9 +23,9 @@ rjmp setup
 .equ SRAM_DATA_END = (SRAM_DATA_START + 512)
 
 .include "aux.s"
-.include "enc.s"
+.include "../peripherals/enc.s"
 .include "dmx.s"
-.include "ssd1306.s"
+.include "../peripherals/ssd1306.s"
 .include "menu.s"
 
 setup:
