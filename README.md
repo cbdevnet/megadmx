@@ -5,7 +5,12 @@ Minimalistic DMX & ArtNet projects using the ATmega8
 * DMX receiver with PWM outputs using an ATmega8 and a MAX481
 * DMX receiver with PWM outputs using an ATtiny13 and a MAX481
 
-Documentation TBD
+In order to properly receive DMX data, the oscillator must run at
+8MHz, either by supplying an external clock source or flashing the
+fuse bytes to provide this via the internal oscillator.
+
+A target to flash the respective controllers to an 8MHz internal
+clock is provided in the respective `makefile`s.
 
 ## Hardware Setup
 
